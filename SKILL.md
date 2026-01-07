@@ -158,6 +158,24 @@ bun ~/.pi/agent/skills/mcp-to-skill/lib.ts validate ~/.claude/skills/my-mcp
 bun ~/.pi/agent/skills/mcp-to-skill/lib.ts test ~/.claude/skills/my-mcp --list
 ```
 
+### Step 5: 查看状态和统计
+
+```bash
+cd ~/.claude/skills/my-mcp
+
+# 查看状态
+uv run executor.py --status
+
+# 查看统计
+uv run executor.py --stats
+
+# 查看日志
+uv run executor.py --logs 100
+
+# 重置统计
+uv run executor.py --reset-stats
+```
+
 ## Examples
 
 ### Example 1: stdio 传输

@@ -2,18 +2,26 @@
 """
 MCP Skill Executor (Multi-transport)
 ====================================
-Supports stdio, SSE, and HTTP transports for MCP.
+Supports stdio, SSE, and HTTP transports for MCP with stats tracking.
 """
 
 import json
 import sys
 import asyncio
 import argparse
+import time
 from pathlib import Path
 from typing import Optional, Dict, Any
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+
+# Import stats manager
+try:
+    from stats_manager import MCPStatsManager, init_stats_manager, get_stats_manager
+    HAS_STATS = True
+except ImportError:
+    HAS_STATS = False
 
 
 async def list_tools(config):
@@ -122,6 +130,31 @@ async def call_tool(config, tool_name, arguments):
         raise ValueError(f"Unsupported transport: {transport}")
 
 
+async def call_tool_with_stats(config, tool_name, arguments):
+    """Call a tool with statistics tracking."""
+    start_time = time.time()
+    success = False
+    error = None
+    result = None
+
+    try:
+        result = await call_tool(config, tool_name, arguments)
+        success = True
+    except Exception as e:
+        error = str(e)
+        raise
+    finally:
+        duration = time.time() - start_time
+
+        # Record stats if available
+        if HAS_STATS:
+            stats_manager = get_stats_manager()
+            if stats_manager:
+                stats_manager.record_call(tool_name, arguments, success, duration, error)
+
+    return result
+
+
 async def call_tool_stdio(config, tool_name, arguments):
     """Call a tool from stdio MCP server."""
     server_params = StdioServerParameters(
@@ -159,6 +192,9 @@ Examples:
   %(prog)s --list                          List all available tools
   %(prog)s --describe tool_name           Get tool schema and parameters
   %(prog)s --call '{"tool": "..."}'        Execute a tool call
+  %(prog)s --status                        Show status and statistics
+  %(prog)s --stats                         Show detailed statistics
+  %(prog)s --logs [limit]                  Show recent logs
 
 Supported transports:
   stdio (default) - Standard input/output
@@ -169,6 +205,11 @@ Supported transports:
     parser.add_argument("--call", help="JSON tool call to execute")
     parser.add_argument("--describe", help="Get tool schema")
     parser.add_argument("--list", action="store_true", help="List all tools")
+    parser.add_argument("--status", action="store_true", help="Show status and statistics")
+    parser.add_argument("--stats", action="store_true", help="Show detailed statistics")
+    parser.add_argument("--logs", nargs='?', const=100, type=int, help="Show recent logs (default: 100)")
+    parser.add_argument("--tool", help="Filter logs by tool name")
+    parser.add_argument("--reset-stats", action="store_true", help="Reset all statistics")
     parser.add_argument("--version", action="version", version="%(prog)s 2.0.0")
 
     args = parser.parse_args()
@@ -181,6 +222,10 @@ Supported transports:
 
     with open(config_path) as f:
         config = json.load(f)
+
+    # Initialize stats manager
+    if HAS_STATS:
+        init_stats_manager(Path(__file__).parent)
 
     # Detect transport
     transport = config.get("transport", "stdio")
@@ -201,7 +246,7 @@ Supported transports:
 
         elif args.call:
             call_data = json.loads(args.call)
-            result = await call_tool(
+            result = await call_tool_with_stats(
                 config,
                 call_data["tool"],
                 call_data.get("arguments", {})
@@ -216,6 +261,38 @@ Supported transports:
                         print(json.dumps(item.__dict__ if hasattr(item, '__dict__') else item, indent=2))
             else:
                 print(json.dumps(result.__dict__ if hasattr(result, '__dict__') else result, indent=2))
+
+        elif args.status:
+            if HAS_STATS:
+                stats_manager = get_stats_manager()
+                status = stats_manager.get_status()
+                print(json.dumps(status, indent=2, ensure_ascii=False))
+            else:
+                print("Stats tracking not available", file=sys.stderr)
+
+        elif args.stats:
+            if HAS_STATS:
+                stats_manager = get_stats_manager()
+                stats = stats_manager.get_stats()
+                print(json.dumps(stats, indent=2, ensure_ascii=False))
+            else:
+                print("Stats tracking not available", file=sys.stderr)
+
+        elif args.logs is not None:
+            if HAS_STATS:
+                stats_manager = get_stats_manager()
+                logs = stats_manager.get_logs(limit=args.logs, tool_name=args.tool)
+                print(json.dumps(logs, indent=2, ensure_ascii=False))
+            else:
+                print("Stats tracking not available", file=sys.stderr)
+
+        elif args.reset_stats:
+            if HAS_STATS:
+                stats_manager = get_stats_manager()
+                stats_manager.reset_stats()
+                print("Statistics reset successfully")
+            else:
+                print("Stats tracking not available", file=sys.stderr)
         else:
             parser.print_help()
 

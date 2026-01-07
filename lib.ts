@@ -153,6 +153,41 @@ cd $SKILL_DIR
 uv run executor.py --call '{"tool": "tool_name", "arguments": {"param1": "value"}}'
 \`\`\`
 
+### Example 4: Show status
+
+\`\`\`bash
+cd $SKILL_DIR
+uv run executor.py --status
+\`\`\`
+
+### Example 5: Show statistics
+
+\`\`\`bash
+cd $SKILL_DIR
+uv run executor.py --stats
+\`\`\`
+
+### Example 6: Show recent logs
+
+\`\`\`bash
+cd $SKILL_DIR
+uv run executor.py --logs 50
+\`\`\`
+
+### Example 7: Filter logs by tool
+
+\`\`\`bash
+cd $SKILL_DIR
+uv run executor.py --logs 100 --tool tool_name
+\`\`\`
+
+### Example 8: Reset statistics
+
+\`\`\`bash
+cd $SKILL_DIR
+uv run executor.py --reset-stats
+\`\`\`
+
 ## Error Handling
 
 If the executor returns an error:
@@ -211,6 +246,11 @@ function copyTemplateFiles(skillDir: string, config: MCPConfig): void {
   const executorDst = path.join(skillDir, 'executor.py')
   writeFileSync(executorDst, readFileSync(executorSrc))
   execSync(`chmod +x ${executorDst}`)
+
+  // Copy stats_manager.py
+  const statsSrc = path.join(templateDir, 'stats_manager.py')
+  const statsDst = path.join(skillDir, 'stats_manager.py')
+  writeFileSync(statsDst, readFileSync(statsSrc))
 
   // Generate pyproject.toml
   const pyproject = generatePyprojectToml(config.name, transport)

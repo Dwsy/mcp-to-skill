@@ -191,6 +191,74 @@ uv run executor.py --describe tool_name
 
 # 调用工具
 uv run executor.py --call '{"tool": "tool_name", "arguments": {...}}'
+
+# 查看状态
+uv run executor.py --status
+
+# 查看统计
+uv run executor.py --stats
+
+# 查看日志
+uv run executor.py --logs 100
+
+# 过滤日志
+uv run executor.py --logs 100 --tool tool_name
+
+# 重置统计
+uv run executor.py --reset-stats
+```
+
+## Statistics and Logging
+
+### Status
+
+显示技能的整体状态：
+
+```bash
+uv run executor.py --status
+```
+
+输出包括：
+- 总调用次数
+- 成功/失败次数
+- 运行时间
+- 日志文件大小
+
+### Statistics
+
+显示详细的工具调用统计：
+
+```bash
+uv run executor.py --stats
+```
+
+输出包括：
+- 每个工具的调用次数
+- 成功率
+- 平均响应时间
+- 首次/最后调用时间
+
+### Logs
+
+查看最近的调用日志：
+
+```bash
+# 查看最近 100 条日志
+uv run executor.py --logs
+
+# 查看最近 50 条日志
+uv run executor.py --logs 50
+
+# 过滤特定工具的日志
+uv run executor.py --logs 100 --tool tool_name
+```
+
+### Reset
+
+重置所有统计数据：
+
+```bash
+uv run executor.py --reset-stats
 ```
 
 ## Performance
@@ -275,6 +343,36 @@ bun ~/.pi/agent/skills/mcp-to-skill/lib.ts validate <path>
 
 # Test
 bun ~/.pi/agent/skills/mcp-to-skill/lib.ts test <path> [--list | --describe <tool>]
+```
+
+## Executor Commands
+
+```bash
+cd ~/.claude/skills/my-mcp
+
+# List tools
+uv run executor.py --list
+
+# Describe tool
+uv run executor.py --describe tool_name
+
+# Call tool
+uv run executor.py --call '{"tool": "...", "arguments": {...}}'
+
+# Show status
+uv run executor.py --status
+
+# Show statistics
+uv run executor.py --stats
+
+# Show logs
+uv run executor.py --logs [limit]
+
+# Filter logs by tool
+uv run executor.py --logs 100 --tool tool_name
+
+# Reset statistics
+uv run executor.py --reset-stats
 ```
 
 ## Documentation

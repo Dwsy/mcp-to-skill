@@ -17,6 +17,8 @@ ENV/
 # MCP Runtime
 .mcp.pid
 .mcp.last_active
+.mcp.stats.json
+.mcp.logs.jsonl
 
 # IDE
 .vscode/
