@@ -1,95 +1,102 @@
 # mcp-to-skill
 
-将任何 MCP 服务器封装为 Claude Skill，支持 stdio/SSE/HTTP 传输协议，使用 uv 管理依赖，实现一键转换、验证和测试。
+将任何 MCP 服务器封装为 Claude Skill，支持 stdio/SSE/HTTP 传输协议，提供 CLI 和 Python SDK 双模式。
 
 ## Features
 
-- ✅ **多传输协议支持**: stdio/SSE/HTTP
+- ✅ **双模式支持**: CLI 命令行工具 + Python SDK
+- ✅ **多传输协议**: stdio/SSE/HTTP
 - ✅ **uv 依赖管理**: 比 pip 快 10-100 倍
 - ✅ **自动 introspect**: 自动获取工具列表
 - ✅ **一键转换**: 从配置到可用技能
-- ✅ **验证和测试**: 内置 validate 和 test 命令
+- ✅ **统计追踪**: 工具调用统计和日志
 - ✅ **上下文节省**: 96%+ 上下文节省
-
-## Supported Transports
-
-### stdio (默认)
-
-标准输入输出传输，大多数 MCP 服务器使用此协议。
-
-```json
-{
-  "name": "github",
-  "transport": "stdio",
-  "command": "npx",
-  "args": ["@modelcontextprotocol/server-github"],
-  "env": {"GITHUB_TOKEN": "your-token"}
-}
-```
-
-### SSE
-
-通过 HTTP SSE 连接 MCP 服务器，适用于远程 MCP 服务。
-
-```json
-{
-  "name": "deepwiki",
-  "transport": "sse",
-  "endpoint": "https://mcp.deepwiki.com/sse"
-}
-```
-
-### HTTP
-
-HTTP 轮询传输协议（实验性）。
-
-```json
-{
-  "name": "http-mcp",
-  "transport": "http",
-  "endpoint": "https://api.example.com/mcp"
-}
-```
 
 ## Installation
 
+### Python SDK (pip)
+
 ```bash
-# 确保 uv 已安装
+pip install mcp-to-skill
+```
+
+### Bun CLI (本地)
+
+```bash
+# 确保已安装 uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 或使用 brew
-brew install uv
+# 使用本地 lib.ts
+bun lib.ts convert my-mcp.json
 ```
 
 ## Usage
 
-### Convert MCP to Skill
+### Python SDK
 
-```bash
-# 基本用法
-bun ~/.pi/agent/skills/mcp-to-skill/lib.ts convert my-mcp.json
+```python
+from mcp_to_skill import (
+    MCPConfig,
+    SkillConfig,
+    Transport,
+    convert_to_skill,
+    validate_skill,
+    test_skill,
+    get_skill_status
+)
 
-# 指定输出目录
-bun ~/.pi/agent/skills/mcp-to-skill/lib.ts convert my-mcp.json --output=/custom/path
+# Convert MCP server to skill
+config = MCPConfig(
+    name="github",
+    transport=Transport.STDIO,
+    command="npx",
+    args=["@modelcontextprotocol/server-github"],
+    env={"GITHUB_TOKEN": "your-token"}
+)
 
-# 仅生成不安装
-bun ~/.pi/agent/skills/mcp-to-skill/lib.ts convert my-mcp.json --no-install
+skill_info = convert_to_skill(config)
+print(f"Skill created at: {skill_info.path}")
+
+# Validate skill
+validation = validate_skill(skill_info.path)
+print(f"Valid: {validation['valid']}")
+print(f"Tools: {len(validation['tools'])}")
+
+# Get status
+status = get_skill_status(skill_info.path)
+print(f"Total calls: {status['stats']['total_calls']}")
 ```
 
-### Validate Skill
+### CLI
 
 ```bash
-bun ~/.pi/agent/skills/mcp-to-skill/lib.ts validate ~/.claude/skills/my-mcp
+# Convert
+mcp-to-skill convert my-mcp.json
+
+# Validate
+mcp-to-skill validate ~/.claude/skills/my-mcp
+
+# Test
+mcp-to-skill test ~/.claude/skills/my-mcp --mode list
+
+# Status
+mcp-to-skill status ~/.claude/skills/my-mcp
+
+# Reset stats
+mcp-to-skill reset-stats ~/.claude/skills/my-mcp
 ```
 
-### Test Skill
+### Bun CLI (本地)
 
 ```bash
-# 列出工具
-bun ~/.pi/agent/skills/mcp-to-skill/lib.ts test ~/.claude/skills/my-mcp --list
+# Convert
+bun lib.ts convert my-mcp.json
 
-# 查看工具详情
-bun ~/.pi/agent/skills/mcp-to-skill/lib.ts test ~/.claude/skills/my-mcp --describe tool_name
+# Validate
+bun lib.ts validate ~/.claude/skills/my-mcp
+
+# Test
+bun lib.ts test ~/.claude/skills/my-mcp --list
 ```
 
 ## MCP Config Format
@@ -104,161 +111,115 @@ bun ~/.pi/agent/skills/mcp-to-skill/lib.ts test ~/.claude/skills/my-mcp --descri
   "env": {"API_KEY": "your-key"},
   "keep_alive": {
     "enabled": true,
-    "timeout": 3600,
-    "check_interval": 60
+    "timeout": 3600
   }
 }
 ```
 
 ## Examples
 
-### Example 1: GitHub MCP
+### Example 1: GitHub MCP (stdio)
 
-```bash
-cat > github-mcp.json << 'EOF'
-{
-  "name": "github",
-  "transport": "stdio",
-  "command": "npx",
-  "args": ["-y", "@modelcontextprotocol/server-github"],
-  "env": {"GITHUB_TOKEN": "ghp_your_token"}
-}
-EOF
+```python
+from mcp_to_skill import MCPConfig, Transport, convert_to_skill
 
-bun ~/.pi/agent/skills/mcp-to-skill/lib.ts convert github-mcp.json
+config = MCPConfig(
+    name="github",
+    transport=Transport.STDIO,
+    command="npx",
+    args=["-y", "@modelcontextprotocol/server-github"],
+    env={"GITHUB_TOKEN": "ghp_your_token"}
+)
+
+skill = convert_to_skill(config)
 ```
 
 ### Example 2: DeepWiki (SSE)
 
-```bash
-cat > deepwiki.json << 'EOF'
-{
-  "name": "deepwiki",
-  "transport": "sse",
-  "endpoint": "https://mcp.deepwiki.com/sse"
-}
-EOF
+```python
+from mcp_to_skill import MCPConfig, Transport, convert_to_skill
 
-bun ~/.pi/agent/skills/mcp-to-skill/lib.ts convert deepwiki.json
+config = MCPConfig(
+    name="deepwiki",
+    transport=Transport.SSE,
+    endpoint="https://mcp.deepwiki.com/sse"
+)
+
+skill = convert_to_skill(config)
 ```
 
-### Example 3: Custom MCP
+### Example 3: Enable Process Reuse
 
-```bash
-cat > local-mcp.json << 'EOF'
-{
-  "name": "local-tools",
-  "transport": "stdio",
-  "command": "node",
-  "args": ["./my-mcp-server.js"],
-  "env": {},
-  "keep_alive": {
-    "enabled": true,
-    "timeout": 1800
-  }
-}
-EOF
+```python
+from mcp_to_skill import MCPConfig, Transport, convert_to_skill
 
-bun ~/.pi/agent/skills/mcp-to-skill/lib.ts convert local-mcp.json
+config = MCPConfig(
+    name="my-mcp",
+    transport=Transport.STDIO,
+    command="npx",
+    args=["@example/mcp-server"],
+    keep_alive={
+        "enabled": True,
+        "timeout": 3600,
+        "check_interval": 60
+    }
+)
+
+skill = convert_to_skill(config)
 ```
 
-## Generated Skill Structure
+## API Reference
 
-转换后的技能包含以下文件：
+### MCPConfig
 
-```
-~/.claude/skills/{name}/
-├── SKILL.md              # 技能文档
-├── executor.py           # Python 执行器
-├── process_manager.py    # 进程管理器（可选）
-├── pyproject.toml        # uv 项目配置
-├── mcp-config.json       # MCP 服务器配置
-├── package.json          # 元数据
-├── .mcp.pid              # 进程 PID（运行时）
-└── .mcp.last_active      # 最后活跃时间（运行时）
-```
-
-## Using Generated Skills
-
-```bash
-cd ~/.claude/skills/my-mcp
-
-# 列出工具
-uv run executor.py --list
-
-# 查看工具详情
-uv run executor.py --describe tool_name
-
-# 调用工具
-uv run executor.py --call '{"tool": "tool_name", "arguments": {...}}'
-
-# 查看状态
-uv run executor.py --status
-
-# 查看统计
-uv run executor.py --stats
-
-# 查看日志
-uv run executor.py --logs 100
-
-# 过滤日志
-uv run executor.py --logs 100 --tool tool_name
-
-# 重置统计
-uv run executor.py --reset-stats
+```python
+@dataclass
+class MCPConfig:
+    name: str
+    transport: Transport = Transport.STDIO
+    command: Optional[str] = None
+    args: Optional[List[str]] = None
+    endpoint: Optional[str] = None
+    env: Optional[Dict[str, str]] = None
+    keep_alive: Optional[Dict[str, Any]] = None
 ```
 
-## Statistics and Logging
+### convert_to_skill()
 
-### Status
-
-显示技能的整体状态：
-
-```bash
-uv run executor.py --status
+```python
+def convert_to_skill(
+    mcp_config: MCPConfig,
+    skill_config: Optional[SkillConfig] = None
+) -> SkillInfo
 ```
 
-输出包括：
-- 总调用次数
-- 成功/失败次数
-- 运行时间
-- 日志文件大小
+### validate_skill()
 
-### Statistics
-
-显示详细的工具调用统计：
-
-```bash
-uv run executor.py --stats
+```python
+def validate_skill(skill_path: str) -> Dict[str, Any]
 ```
 
-输出包括：
-- 每个工具的调用次数
-- 成功率
-- 平均响应时间
-- 首次/最后调用时间
+### test_skill()
 
-### Logs
-
-查看最近的调用日志：
-
-```bash
-# 查看最近 100 条日志
-uv run executor.py --logs
-
-# 查看最近 50 条日志
-uv run executor.py --logs 50
-
-# 过滤特定工具的日志
-uv run executor.py --logs 100 --tool tool_name
+```python
+def test_skill(
+    skill_path: str,
+    mode: Literal["list", "describe", "call"] = "list",
+    tool_name: Optional[str] = None,
+    arguments: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]
 ```
 
-### Reset
+### get_skill_status()
 
-重置所有统计数据：
+```python
+def get_skill_status(skill_path: str) -> Dict[str, Any]
+```
 
-```bash
-uv run executor.py --reset-stats
+### reset_skill_stats()
+
+```python
+def reset_skill_stats(skill_path: str) -> Dict[str, Any]
 ```
 
 ## Performance
@@ -286,100 +247,21 @@ uv run executor.py --reset-stats
 | Subsequent calls | 5s | <0.5s | 10x |
 | 10 calls | 50s | 5s | 10x |
 
-## Keep Alive (Process Reuse)
-
-启用进程复用以提升性能：
-
-```json
-{
-  "keep_alive": {
-    "enabled": true,
-    "timeout": 3600,  // 1 hour
-    "check_interval": 60  // 1 minute
-  }
-}
-```
-
 ## Requirements
 
+### Python SDK
 - Python 3.10+
-- uv (https://astral.sh/uv)
+- httpx>=0.25.0
+
+### Bun CLI
 - Bun runtime
-
-## Troubleshooting
-
-### "uv not found"
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-### "Unsupported transport"
-
-检查 `transport` 字段是否为 `stdio`/`sse`/`http`。
-
-### "endpoint required"
-
-SSE/HTTP 传输需要 `endpoint` 字段。
-
-### "uv sync failed"
-
-```bash
-cd ~/.claude/skills/my-mcp
-uv sync --verbose
-```
-
-## CLI Commands
-
-```bash
-# 显示帮助
-bun ~/.pi/agent/skills/mcp-to-skill/lib.ts
-
-# Convert
-bun ~/.pi/agent/skills/mcp-to-skill/lib.ts convert <config> [--output=/path] [--no-install]
-
-# Validate
-bun ~/.pi/agent/skills/mcp-to-skill/lib.ts validate <path>
-
-# Test
-bun ~/.pi/agent/skills/mcp-to-skill/lib.ts test <path> [--list | --describe <tool>]
-```
-
-## Executor Commands
-
-```bash
-cd ~/.claude/skills/my-mcp
-
-# List tools
-uv run executor.py --list
-
-# Describe tool
-uv run executor.py --describe tool_name
-
-# Call tool
-uv run executor.py --call '{"tool": "...", "arguments": {...}}'
-
-# Show status
-uv run executor.py --status
-
-# Show statistics
-uv run executor.py --stats
-
-# Show logs
-uv run executor.py --logs [limit]
-
-# Filter logs by tool
-uv run executor.py --logs 100 --tool tool_name
-
-# Reset statistics
-uv run executor.py --reset-stats
-```
+- uv (https://astral.sh/uv)
 
 ## Documentation
 
+- [Python SDK Guide](README_PYTHON.md)
 - [MCP 规范](https://modelcontextprotocol.io)
 - [uv 文档](https://astral.sh/uv)
-- [mcp-to-skill-converter](https://github.com/GBSOSS/-mcp-to-skill-converter)
 
 ## License
 
