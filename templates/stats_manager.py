@@ -32,6 +32,7 @@ class MCPStatsManager:
                 pass
 
         return {
+            'session_name': 'default',
             'total_calls': 0,
             'successful_calls': 0,
             'failed_calls': 0,
@@ -117,9 +118,20 @@ class MCPStatsManager:
         logs.sort(key=lambda x: x.get('timestamp', 0), reverse=True)
         return logs[:limit]
 
+    def set_session_name(self, name: str):
+        """Set session name."""
+        self.stats['session_name'] = name
+        self._save_stats()
+
+    def get_session_name(self) -> str:
+        """Get session name."""
+        return self.stats.get('session_name', 'default')
+
     def reset_stats(self):
         """Reset all statistics."""
+        session_name = self.stats.get('session_name', 'default')
         self.stats = {
+            'session_name': session_name,
             'total_calls': 0,
             'successful_calls': 0,
             'failed_calls': 0,
