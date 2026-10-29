@@ -220,8 +220,8 @@ Savings: ~${Math.round((1 - 5000 / (tools.length * 500)) * 100)}% reduction in t
  */
 function generatePyprojectToml(name: string, transport: string = 'stdio'): string {
   const deps = transport === 'stdio'
-    ? '    "mcp>=1.0.0",'
-    : '    "mcp>=1.0.0",\n    "httpx>=0.25.0",'
+    ? '    "mcp>=1.0.0",\n    "python-dotenv>=1.0.0",'
+    : '    "mcp>=1.0.0",\n    "httpx>=0.25.0",\n    "python-dotenv>=1.0.0",'
 
   return `[project]
 name = "${name}-executor"
@@ -294,7 +294,7 @@ async function introspectMCP(config: MCPConfig): Promise<any[]> {
     console.log('Installing dependencies with uv...')
     try {
       execSync(`cd ${tempDir} && uv init --no-readme --no-pin-python 2>/dev/null || true`, { stdio: 'ignore' })
-      execSync(`cd ${tempDir} && uv add mcp --quiet`, { stdio: 'ignore' })
+      execSync(`cd ${tempDir} && uv add mcp python-dotenv --quiet`, { stdio: 'ignore' })
     } catch (e) {
       // uv init might fail if directory not empty, that's ok
     }

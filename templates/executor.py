@@ -16,6 +16,7 @@ from typing import Optional, Dict, Any
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from mcp.client.streamable_http import streamable_http_client
 from dotenv import load_dotenv
 import os
 
@@ -106,30 +107,19 @@ async def list_tools_sse(config):
 
 
 async def list_tools_http(config):
-    """List tools from HTTP MCP server."""
-    import httpx
-
+    """List tools from a Streamable HTTP MCP server."""
     endpoint = config.get("endpoint")
     if not endpoint:
         raise ValueError("HTTP transport requires 'endpoint' in config")
 
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            endpoint,
-            json={
-                "jsonrpc": "2.0",
-                "id": str(uuid.uuid4()),
-                "method": "tools/list"
-            },
-            headers={"Content-Type": "application/json"}
-        )
-        result = response.json()
-        if "result" in result and "tools" in result["result"]:
+    async with streamable_http_client(endpoint) as (read_stream, write_stream):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+            response = await session.list_tools()
             return [
-                {"name": t["name"], "description": t.get("description", "")}
-                for t in result["result"]["tools"]
+                {"name": tool.name, "description": tool.description}
+                for tool in response.tools
             ]
-        return []
 
 
 async def http_sse_request(config, method, params=None):
@@ -247,31 +237,21 @@ async def describe_tool_sse(config, tool_name):
 
 
 async def describe_tool_http(config, tool_name):
-    """Describe a tool from HTTP MCP server."""
-    import httpx
-
+    """Describe a tool from a Streamable HTTP MCP server."""
     endpoint = config.get("endpoint")
     if not endpoint:
         raise ValueError("HTTP transport requires 'endpoint' in config")
 
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            endpoint,
-            json={
-                "jsonrpc": "2.0",
-                "id": str(uuid.uuid4()),
-                "method": "tools/list"
-            },
-            headers={"Content-Type": "application/json"}
-        )
-        result = response.json()
-        if "result" in result and "tools" in result["result"]:
-            for t in result["result"]["tools"]:
-                if t["name"] == tool_name:
+    async with streamable_http_client(endpoint) as (read_stream, write_stream):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+            response = await session.list_tools()
+            for tool in response.tools:
+                if tool.name == tool_name:
                     return {
-                        "name": t["name"],
-                        "description": t.get("description", ""),
-                        "inputSchema": t.get("inputSchema", {"type": "object", "properties": {}})
+                        "name": tool.name,
+                        "description": tool.description,
+                        "inputSchema": tool.input_schema
                     }
     return None
 
@@ -347,36 +327,16 @@ async def call_tool_sse(config, tool_name, arguments):
 
 
 async def call_tool_http(config, tool_name, arguments):
-    """Call a tool from HTTP MCP server."""
-    import httpx
-
+    """Call a tool from a Streamable HTTP MCP server."""
     endpoint = config.get("endpoint")
     if not endpoint:
         raise ValueError("HTTP transport requires 'endpoint' in config")
 
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            endpoint,
-            json={
-                "jsonrpc": "2.0",
-                "id": str(uuid.uuid4()),
-                "method": "tools/call",
-                "params": {
-                    "name": tool_name,
-                    "arguments": arguments
-                }
-            },
-            headers={"Content-Type": "application/json"}
-        )
-        result = response.json()
-
-        if "result" in result:
-            content = result["result"].get("content", [])
-            return content
-        elif "error" in result:
-            raise RuntimeError(f"MCP error: {result['error']}")
-        else:
-            return [{"text": json.dumps(result)}]
+    async with streamable_http_client(endpoint) as (read_stream, write_stream):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+            response = await session.call_tool(tool_name, arguments)
+            return response.content
 
 
 async def main():
